@@ -28,31 +28,20 @@
   <link rel="stylesheet" href="https://taxdigital.in/css/style.css">
 
 <style>
-  /* Icons grey color & no background */
-  i.fa,
-  i.fab,
-  i.fas,
-  i.far,
-  i.ti,
-  a i.fa,
-  a i.fab,
-  a i.fas,
-  a i.far,
-  a i.ti {
-    color: #ffffff;
-    background: transparent !important;
-    border: none;
-    border-radius: 0;
-    padding: 0;
+  /* Reset icons styling */
+  i.ti, i.fa, i.fab, i.fas, i.far {
+    color: grey !important;
+    background: none !important;
+    visibility: visible !important;
+    font-size: inherit !important;
   }
 
-  /* Remove unwanted button/icon styles from header/footer/socials */
-  .btn i,
-  .navbar a i,
-  .header-top-socials a i,
-  footer i {
-    background: transparent !important;
-    color: grey !important;
+  /* Ensure parent elements don't hide icons */
+  .header-top-socials i,
+  .navbar-toggler i,
+  .header-top-info i {
+    background: none !important;
+    visibility: visible !important;
   }
 </style>
 
