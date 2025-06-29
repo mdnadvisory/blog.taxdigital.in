@@ -1,51 +1,53 @@
-const fs = require('fs');
-const path = require('path');
+// generate-categories.js
 
-const blogDirs = ['gst']; // ← Yahan apne blog folders add karte jao
-const templatePath = path.join('layout', 'category-template.html');
-const outputDir = 'category';
+const fs = require("fs");
+const path = require("path");
 
-// Step 1: Read Template
-const template = fs.readFileSync(templatePath, 'utf-8');
-const categoryPosts = {};
+const categories = ["gst", "income-tax"];
+const blogRoot = path.join(__dirname);
+const categoryDir = path.join(blogRoot, "category");
+const templatePath = path.join(blogRoot, "category-template.html");
+const template = fs.readFileSync(templatePath, "utf-8");
 
-// Step 2: Loop through each folder
-blogDirs.forEach(dir => {
-  const files = fs.readdirSync(dir).filter(f => f.endsWith('.html'));
-
-  files.forEach(file => {
-    const filePath = path.join(dir, file);
-    const html = fs.readFileSync(filePath, 'utf-8');
-
-    const categoryMatch = html.match(/<meta name="category" content="(.*?)"/i);
-    const titleMatch = html.match(/<meta name="title" content="(.*?)"/i);
-
-    if (!categoryMatch || !titleMatch) return;
-
-    const category = categoryMatch[1].toLowerCase();
-    const title = titleMatch[1];
-    const url = `/${dir}/${file}`;
-    const listItem = `<li><a href="${url}">${title}</a></li>`;
-
-    if (!categoryPosts[category]) categoryPosts[category] = [];
-    categoryPosts[category].push(listItem);
-  });
-});
-
-// Step 3: Create category output folder if needed
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir);
+// Ensure category folder exists
+if (!fs.existsSync(categoryDir)) {
+  fs.mkdirSync(categoryDir);
 }
 
-// Step 4: Write HTML files for each category
-Object.entries(categoryPosts).forEach(([category, posts]) => {
-  const htmlContent = template
-    .replace(/{{categoryTitle}}/g, category.toUpperCase())
-    .replace('{{postsList}}', posts.join('\n'));
+categories.forEach((cat) => {
+  const catFolder = path.join(blogRoot, cat);
+  let postsList = "";
 
-  const outputPath = path.join(outputDir, `${category}.html`);
-  fs.writeFileSync(outputPath, htmlContent);
-  console.log(`✅ Created: ${outputPath}`);
+  if (fs.existsSync(catFolder)) {
+    const files = fs.readdirSync(catFolder);
+
+    files.forEach((file) => {
+      const filename = path.basename(file, ".html");
+      const postUrl = `/${cat}/${file}`;
+      const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+      postsList += `
+        <div class="col-lg-6 col-md-6 mb-5">
+          <div class="blog-item">
+            <img src="https://taxdigital.in/images/blog/1.jpg" alt="${postTitle}" class="img-fluid rounded">
+            <div class="blog-item-content bg-white p-4">
+              <div class="blog-item-meta py-1 px-2">
+                <span class="text-muted text-capitalize mr-3"><i class="ti-pencil-alt mr-2"></i>${cat}</span>
+              </div>
+              <h3 class="mt-3 mb-3"><a href="${postUrl}">${postTitle}</a></h3>
+              <p class="mb-4">Learn more about ${postTitle} and other insights in the ${cat.toUpperCase()} category.</p>
+              <a href="${postUrl}" class="btn btn-small btn-main btn-round-full">Learn More</a>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  const output = template
+    .replace(/{{categoryTitle}}/g, cat.toUpperCase())
+    .replace(/{{postsList}}/g, postsList || `<p>No posts available in this category yet.</p>`);
+
+  fs.writeFileSync(path.join(categoryDir, `${cat}.html`), output);
+  console.log(`✅ Category page generated: ${cat}.html`);
 });
-
-console.log('🎉 All category pages generated successfully.');
