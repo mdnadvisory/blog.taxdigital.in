@@ -112,3 +112,18 @@ categories.forEach((cat) => {
     });
   }
 });
+
+// ✅ Inject Latest Posts into index.html
+const indexPath = path.join(blogRoot, "index.html");
+if (fs.existsSync(indexPath)) {
+  const indexHtml = fs.readFileSync(indexPath, "utf-8");
+
+  const updatedIndex = indexHtml.replace(
+    /<!--\s*{{latestPosts}}\s*-->/,
+    latestHtml
+  );
+
+  fs.writeFileSync(indexPath, updatedIndex);
+  console.log("🏠 Injected latest posts into: index.html");
+}
+
