@@ -1,0 +1,21 @@
+name: Ping Search Engines After Deployment
+
+on:
+  push:
+    branches: [ main ]  # agar branch ka naam 'main' nahi hai to yeh line change karo
+
+jobs:
+  ping_search_engines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Google
+        run: curl "https://www.google.com/ping?sitemap=https://blog.taxdigital.in/sitemap.xml"
+
+      - name: Ping Bing
+        run: curl "https://www.bing.com/ping?sitemap=https://blog.taxdigital.in/sitemap.xml"
+
+      - name: Ping Yandex
+        run: curl "https://yandex.com/ping?sitemap=https://blog.taxdigital.in/sitemap.xml"
+
+      - name: Ping IndexNow (via Bing)
+        run: curl -X POST "https://api.indexnow.org/indexnow?url=https://blog.taxdigital.in/&key-location=https://blog.taxdigital.in/.well-known/key.txt&key=YOUR_INDEXNOW_KEY"
