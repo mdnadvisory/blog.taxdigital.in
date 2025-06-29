@@ -1,40 +1,26 @@
 const fs = require("fs");
 const path = require("path");
 
-const categories = ["gst", "itr"];
+const categories = ["gst", "income-tax"];
 const blogRoot = path.join(__dirname);
 const categoryDir = path.join(blogRoot, "category");
 const templatePath = path.join(blogRoot, "category-template.html");
 const template = fs.readFileSync(templatePath, "utf-8");
-const indexPath = path.join(blogRoot, "index.html");
 
-// Ensure category folder exists
-if (!fs.existsSync(categoryDir)) {
-  fs.mkdirSync(categoryDir);
-}
-
-let latestPostsHtml = [];
+// 🟩 STEP 1: Generate Category Pages
+if (!fs.existsSync(categoryDir)) fs.mkdirSync(categoryDir);
 
 categories.forEach((cat) => {
   const catFolder = path.join(blogRoot, cat);
   let postsList = "";
 
   if (fs.existsSync(catFolder)) {
-    const files = fs.readdirSync(catFolder)
-      .filter(file => file.endsWith(".html"))
-      .sort((a, b) => fs.statSync(path.join(catFolder, b)).mtime - fs.statSync(path.join(catFolder, a)).mtime);
-
-    // Add to latestPosts list
-    latestPostsHtml.push(...files.map((file) => ({
-      category: cat,
-      file,
-      mtime: fs.statSync(path.join(catFolder, file)).mtime
-    })));
+    const files = fs.readdirSync(catFolder);
 
     files.forEach((file) => {
       const filename = path.basename(file, ".html");
       const postUrl = `/${cat}/${file}`;
-      const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+      const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
       postsList += `
         <div class="col-lg-6 col-md-6 mb-5">
@@ -52,81 +38,65 @@ categories.forEach((cat) => {
         </div>
       `;
     });
+
+    const output = template
+      .replace(/{{categoryTitle}}/g, cat.toUpperCase())
+      .replace(/{{postsList}}/g, postsList || `<p>No posts available in this category yet.</p>`);
+
+    fs.writeFileSync(path.join(categoryDir, `${cat}.html`), output);
+    console.log(`✅ Category page generated: ${cat}.html`);
   }
-
-  const output = template
-    .replace(/{{categoryTitle}}/g, cat.toUpperCase())
-    .replace(/{{postsList}}/g, postsList || `<p>No posts available in this category yet.</p>`);
-
-  fs.writeFileSync(path.join(categoryDir, `${cat}.html`), output);
-  console.log(`✅ Category page generated: ${cat}.html`);
 });
 
-// -------- Update Latest Posts in index.html --------
-latestPostsHtml = latestPostsHtml
-  .sort((a, b) => b.mtime - a.mtime)
-  .slice(0, 3)
-  .map(({ file, category }) => {
-    const filename = path.basename(file, ".html");
-    const postUrl = `/${category}/${file}`;
-    const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+// 🟨 STEP 2: Inject Latest Posts Into Every Blog Post
+let allPosts = [];
 
-    return `
-      <div class="media border-bottom py-3">
-        <a href="${postUrl}"><img class="mr-4" src="https://taxdigital.in/images/blog/bt-1.jpg" alt="${postTitle}"></a>
-        <div class="media-body">
-            <h6 class="my-2"><a href="${postUrl}">${postTitle}</a></h6>
-            <span class="text-sm text-muted">Recently Added</span>
-        </div>
-      </div>`;
-  }).join("\n");
-
-let indexContent = fs.readFileSync(indexPath, "utf-8");
-
-indexContent = indexContent.replace(
-  /<div class="sidebar-widget latest-post card border-0 p-4 mb-3">[\s\S]*?<div class="sidebar-widget bg-white rounded tags/,
-  `<div class="sidebar-widget latest-post card border-0 p-4 mb-3">
-    <h5>Latest Posts</h5>
-    ${latestPostsHtml}
-  </div>\n<div class="sidebar-widget bg-white rounded tags`
-);
-
-fs.writeFileSync(indexPath, indexContent);
-console.log("✅ Latest posts updated in index.html");
-
-
-// ---- Update Latest Posts in all individual post files ----
 categories.forEach((cat) => {
   const catFolder = path.join(blogRoot, cat);
-  if (!fs.existsSync(catFolder)) return;
 
-  const postFiles = fs.readdirSync(catFolder).filter(file => file.endsWith(".html"));
+  if (fs.existsSync(catFolder)) {
+    const files = fs.readdirSync(catFolder);
 
-  postFiles.forEach((file) => {
-    const postPath = path.join(catFolder, file);
-    let content = fs.readFileSync(postPath, "utf-8");
+    files.forEach((file) => {
+      const filePath = path.join(catFolder, file);
+      const filename = path.basename(file, ".html");
+      const title = filename.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-    // Match the section to replace between markers
-    const latestSection = `
-<!--LATEST_POSTS_START-->
-<div class="sidebar-widget latest-post card border-0 p-4 mb-3">
-  <h5>Latest Posts</h5>
-  ${latestPostsHtml}
-</div>
-<!--LATEST_POSTS_END-->`;
+      allPosts.push({
+        title,
+        url: `/${cat}/${file}`,
+        thumb: "https://taxdigital.in/images/blog/bt-1.jpg", // optional: dynamic thumb later
+        date: "01 Jul 2025", // optional: future improvement
+        path: filePath
+      });
+    });
+  }
+});
 
-    // Replace or insert new section
-    if (content.includes("<!--LATEST_POSTS_START-->")) {
-      content = content.replace(/<!--LATEST_POSTS_START-->[\s\S]*?<!--LATEST_POSTS_END-->/, latestSection);
-    } else {
-      // Insert before category/tags section if marker is not found
-      content = content.replace(
-        /(<div class="sidebar-widget bg-white rounded tags[\s\S]*?<\/div>)/,
-        `${latestSection}\n\n$1`
-      );
-    }
+// Generate latest post block HTML
+let latestHTML = "";
 
-    fs.writeFileSync(postPath, content);
-    console.log(`📌 Latest posts added to: ${cat}/${file}`);
-  });
+allPosts.slice(0, 3).forEach(post => {
+  latestHTML += `
+    <div class="media border-bottom py-3">
+      <a href="${post.url}"><img class="mr-4" src="${post.thumb}" alt=""></a>
+      <div class="media-body">
+        <h6 class="my-2"><a href="${post.url}">${post.title}</a></h6>
+        <span class="text-sm text-muted">${post.date}</span>
+      </div>
+    </div>
+  `;
+});
+
+// Inject into all post files
+allPosts.forEach(post => {
+  let html = fs.readFileSync(post.path, "utf-8");
+
+  const newHtml = html.replace(
+    /<div class="sidebar-widget latest-post[^>]*>[\s\S]*?<\/div>/,
+    `<div class="sidebar-widget latest-post card border-0 p-4 mb-3">\n<h5>Latest Posts</h5>${latestHTML}\n</div>`
+  );
+
+  fs.writeFileSync(post.path, newHtml, "utf-8");
+  console.log(`🔁 Updated latest posts in: ${post.url}`);
 });
