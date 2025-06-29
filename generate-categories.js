@@ -1,30 +1,40 @@
-// generate-categories.js
-
 const fs = require("fs");
 const path = require("path");
 
-const categories = ["gst", "income-tax"];
+const categories = ["gst", "itr"];
 const blogRoot = path.join(__dirname);
 const categoryDir = path.join(blogRoot, "category");
 const templatePath = path.join(blogRoot, "category-template.html");
 const template = fs.readFileSync(templatePath, "utf-8");
+const indexPath = path.join(blogRoot, "index.html");
 
 // Ensure category folder exists
 if (!fs.existsSync(categoryDir)) {
   fs.mkdirSync(categoryDir);
 }
 
+let latestPostsHtml = [];
+
 categories.forEach((cat) => {
   const catFolder = path.join(blogRoot, cat);
   let postsList = "";
 
   if (fs.existsSync(catFolder)) {
-    const files = fs.readdirSync(catFolder);
+    const files = fs.readdirSync(catFolder)
+      .filter(file => file.endsWith(".html"))
+      .sort((a, b) => fs.statSync(path.join(catFolder, b)).mtime - fs.statSync(path.join(catFolder, a)).mtime);
+
+    // Add to latestPosts list
+    latestPostsHtml.push(...files.map((file) => ({
+      category: cat,
+      file,
+      mtime: fs.statSync(path.join(catFolder, file)).mtime
+    })));
 
     files.forEach((file) => {
       const filename = path.basename(file, ".html");
       const postUrl = `/${cat}/${file}`;
-      const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
       postsList += `
         <div class="col-lg-6 col-md-6 mb-5">
@@ -51,3 +61,35 @@ categories.forEach((cat) => {
   fs.writeFileSync(path.join(categoryDir, `${cat}.html`), output);
   console.log(`✅ Category page generated: ${cat}.html`);
 });
+
+// -------- Update Latest Posts in index.html --------
+latestPostsHtml = latestPostsHtml
+  .sort((a, b) => b.mtime - a.mtime)
+  .slice(0, 3)
+  .map(({ file, category }) => {
+    const filename = path.basename(file, ".html");
+    const postUrl = `/${category}/${file}`;
+    const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+    return `
+      <div class="media border-bottom py-3">
+        <a href="${postUrl}"><img class="mr-4" src="https://taxdigital.in/images/blog/bt-1.jpg" alt="${postTitle}"></a>
+        <div class="media-body">
+            <h6 class="my-2"><a href="${postUrl}">${postTitle}</a></h6>
+            <span class="text-sm text-muted">Recently Added</span>
+        </div>
+      </div>`;
+  }).join("\n");
+
+let indexContent = fs.readFileSync(indexPath, "utf-8");
+
+indexContent = indexContent.replace(
+  /<div class="sidebar-widget latest-post card border-0 p-4 mb-3">[\s\S]*?<div class="sidebar-widget bg-white rounded tags/,
+  `<div class="sidebar-widget latest-post card border-0 p-4 mb-3">
+    <h5>Latest Posts</h5>
+    ${latestPostsHtml}
+  </div>\n<div class="sidebar-widget bg-white rounded tags`
+);
+
+fs.writeFileSync(indexPath, indexContent);
+console.log("✅ Latest posts updated in index.html");
