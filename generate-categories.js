@@ -16,8 +16,7 @@ const generateLatestPosts = (allPosts) => {
       <h5>Latest Posts</h5>
   `;
 
-  const sorted = allPosts.slice(-3).reverse(); // Last 3 posts
-
+  const sorted = allPosts.slice(-3).reverse(); // Last 3 posts (latest)
   sorted.forEach((post) => {
     latestHtml += `
       <div class="media border-bottom py-3">
@@ -34,6 +33,7 @@ const generateLatestPosts = (allPosts) => {
   return latestHtml;
 };
 
+// Remove old latest post block (for post pages)
 const removeOldLatestBlock = (html) => {
   return html.replace(
     /<div class="sidebar-widget latest-post[\s\S]*?<\/div>\s*<\/div>/,
@@ -41,26 +41,34 @@ const removeOldLatestBlock = (html) => {
   );
 };
 
-// Ensure category folder exists
+// Ensure category output folder exists
 if (!fs.existsSync(categoryDir)) {
   fs.mkdirSync(categoryDir);
 }
 
 let allPosts = [];
 
+// Process each category
 categories.forEach((cat) => {
   const catFolder = path.join(blogRoot, cat);
   let postsList = "";
 
   if (fs.existsSync(catFolder)) {
-    const files = fs.readdirSync(catFolder);
+    let files = fs.readdirSync(catFolder);
+
+    // Sort by file modified time (latest first)
+    files = files.sort((a, b) => {
+      const aTime = fs.statSync(path.join(catFolder, a)).mtime;
+      const bTime = fs.statSync(path.join(catFolder, b)).mtime;
+      return bTime - aTime;
+    });
 
     files.forEach((file) => {
       const filename = path.basename(file, ".html");
       const postUrl = `/${cat}/${file}`;
       const postTitle = filename.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       const postImage = "https://taxdigital.in/images/blog/1.jpg";
-      const postDate = "Updated";
+      const postDate = new Date(fs.statSync(path.join(catFolder, file)).mtime).toLocaleDateString("en-IN");
 
       postsList += `
         <div class="col-lg-6 col-md-6 mb-5">
@@ -90,9 +98,10 @@ categories.forEach((cat) => {
   console.log(`✅ Category page generated: ${cat}.html`);
 });
 
-// Update individual post files with latest posts
+// Generate latest post block
 const latestHtml = generateLatestPosts(allPosts);
 
+// Inject latest posts into individual post files
 categories.forEach((cat) => {
   const catFolder = path.join(blogRoot, cat);
 
@@ -103,27 +112,32 @@ categories.forEach((cat) => {
       const postPath = path.join(catFolder, file);
       const originalHtml = fs.readFileSync(postPath, "utf-8");
       const cleanedHtml = removeOldLatestBlock(originalHtml);
+
       const updatedHtml = cleanedHtml.replace(
         /<div class="sidebar-wrap">([\s\S]*?)<\/div>/,
         `<div class="sidebar-wrap">$1${latestHtml}</div>`
       );
+
       fs.writeFileSync(postPath, updatedHtml);
       console.log(`🔁 Updated latest post in: ${file}`);
     });
   }
 });
 
-// ✅ Inject Latest Posts into index.html
+// ✅ Inject latest posts into index.html
 const indexPath = path.join(blogRoot, "index.html");
 if (fs.existsSync(indexPath)) {
-  const indexHtml = fs.readFileSync(indexPath, "utf-8");
+  let indexHtml = fs.readFileSync(indexPath, "utf-8");
 
-  const updatedIndex = indexHtml.replace(
-    /<!--\s*{{latestPosts}}\s*-->/,
-    latestHtml
-  );
-
-  fs.writeFileSync(indexPath, updatedIndex);
-  console.log("🏠 Injected latest posts into: index.html");
+  // Use marker comments for clean replace
+  if (!indexHtml.includes("<!-- LATEST-POSTS-START -->")) {
+    console.warn("⚠️  Add <!-- LATEST-POSTS-START --> and <!-- LATEST-POSTS-END --> in index.html");
+  } else {
+    const updatedIndex = indexHtml.replace(
+      /<!-- LATEST-POSTS-START -->[\s\S]*?<!-- LATEST-POSTS-END -->/,
+      `<!-- LATEST-POSTS-START -->\n${latestHtml}\n<!-- LATEST-POSTS-END -->`
+    );
+    fs.writeFileSync(indexPath, updatedIndex);
+    console.log("🏠 Injected latest posts into: index.html");
+  }
 }
-
