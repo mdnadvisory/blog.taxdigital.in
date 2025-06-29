@@ -93,3 +93,40 @@ indexContent = indexContent.replace(
 
 fs.writeFileSync(indexPath, indexContent);
 console.log("✅ Latest posts updated in index.html");
+
+
+// ---- Update Latest Posts in all individual post files ----
+categories.forEach((cat) => {
+  const catFolder = path.join(blogRoot, cat);
+  if (!fs.existsSync(catFolder)) return;
+
+  const postFiles = fs.readdirSync(catFolder).filter(file => file.endsWith(".html"));
+
+  postFiles.forEach((file) => {
+    const postPath = path.join(catFolder, file);
+    let content = fs.readFileSync(postPath, "utf-8");
+
+    // Match the section to replace between markers
+    const latestSection = `
+<!--LATEST_POSTS_START-->
+<div class="sidebar-widget latest-post card border-0 p-4 mb-3">
+  <h5>Latest Posts</h5>
+  ${latestPostsHtml}
+</div>
+<!--LATEST_POSTS_END-->`;
+
+    // Replace or insert new section
+    if (content.includes("<!--LATEST_POSTS_START-->")) {
+      content = content.replace(/<!--LATEST_POSTS_START-->[\s\S]*?<!--LATEST_POSTS_END-->/, latestSection);
+    } else {
+      // Insert before category/tags section if marker is not found
+      content = content.replace(
+        /(<div class="sidebar-widget bg-white rounded tags[\s\S]*?<\/div>)/,
+        `${latestSection}\n\n$1`
+      );
+    }
+
+    fs.writeFileSync(postPath, content);
+    console.log(`📌 Latest posts added to: ${cat}/${file}`);
+  });
+});
